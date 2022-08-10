@@ -3,6 +3,7 @@ package config
 import (
 	"flag"
 	"fmt"
+	"github.com/google/uuid"
 	"os"
 	"testing"
 	"time"
@@ -18,6 +19,10 @@ func resetFlags() {
 func TestParseFlags(t *testing.T) {
 	oldArgs := os.Args
 	defer func() { os.Args = oldArgs }()
+
+	cluster1 := uuid.New().String()
+	cluster2 := uuid.New().String()
+
 	os.Args = []string{
 		"redisbetween",
 		"-localsocketprefix", "/some/path/redisbetween-",
@@ -29,8 +34,8 @@ func TestParseFlags(t *testing.T) {
 		"-unlink",
 		"-readtimeout", "1s",
 		"-writetimeout", "1s",
-		"redis://localhost:7000/0?minpoolsize=5&maxpoolsize=33&label=cluster1",
-		"redis://localhost:7002?minpoolsize=${TestParseFlags_MinPoolSize}&label=cluster2&readtimeout=3s&writetimeout=6s",
+		fmt.Sprintf("redis://localhost:7000/0?minpoolsize=5&maxpoolsize=33&label=%s&mirroringtarget=%s", cluster1, cluster2),
+		fmt.Sprintf("redis://localhost:7002?minpoolsize=${TestParseFlags_MinPoolSize}&label=%s&readtimeout=3s&writetimeout=6s", cluster2),
 	}
 
 	minPoolEnvVar := "TestParseFlags_MinPoolSize"
@@ -50,24 +55,26 @@ func TestParseFlags(t *testing.T) {
 	assert.Equal(t, 2, len(c.Upstreams))
 	upstream1 := c.Upstreams[0]
 	upstream2 := c.Upstreams[1]
-	if upstream1.Label == "cluster2" {
+	if upstream1.Label == cluster2 {
 		temp := upstream1
 		upstream1 = upstream2
 		upstream2 = temp
 	}
 
-	assert.Equal(t, "cluster1", upstream1.Label)
+	assert.Equal(t, cluster1, upstream1.Label)
 	assert.Equal(t, "localhost:7000", upstream1.UpstreamConfigHost)
 	assert.Equal(t, 5, upstream1.MinPoolSize)
 	assert.Equal(t, 0, upstream1.Database)
 	assert.Equal(t, 5*time.Second, upstream1.ReadTimeout)
 	assert.Equal(t, 5*time.Second, upstream1.WriteTimeout)
+	assert.Equal(t, cluster2, upstream1.MirroringTarget)
 
-	assert.Equal(t, "cluster2", upstream2.Label)
+	assert.Equal(t, cluster2, upstream2.Label)
 	assert.Equal(t, "localhost:7002", upstream2.UpstreamConfigHost)
 	assert.Equal(t, 1, upstream2.MinPoolSize)
 	assert.Equal(t, 3*time.Second, upstream2.ReadTimeout)
 	assert.Equal(t, 6*time.Second, upstream2.WriteTimeout)
+	assert.Equal(t, "", upstream2.MirroringTarget)
 }
 
 func TestInvalidLogLevel(t *testing.T) {
@@ -122,4 +129,18 @@ func TestMissingAddresses(t *testing.T) {
 	resetFlags()
 	_, err := parseFlags()
 	assert.EqualError(t, err, "missing list of upstream hosts")
+}
+
+func TestSelfMirroring(t *testing.T) {
+	oldArgs := os.Args
+	defer func() { os.Args = oldArgs }()
+	os.Args = []string{
+		"redisbetween",
+		"redis://localhost:7000?minpoolsize=5&label=cluster1&mirroringtarget=cluster1",
+		"redis://localhost:7002?minpoolsize=10&label=cluster2",
+	}
+
+	resetFlags()
+	_, err := parseFlags()
+	assert.EqualError(t, err, "detected self mirroring: cluster1")
 }

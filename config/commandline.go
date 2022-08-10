@@ -43,6 +43,7 @@ type upstream struct {
 	Readonly           bool
 	MaxSubscriptions   int
 	MaxBlockers        int
+	MirroringTarget    string
 }
 
 func ParseFlags() *Options {
@@ -143,6 +144,11 @@ func parseFlags() (*Options, error) {
 				Readonly:           getBoolParam(params, "readonly"),
 				MaxSubscriptions:   getIntParam(params, "maxsubscriptions", 1),
 				MaxBlockers:        getIntParam(params, "maxblockers", 1),
+				MirroringTarget:    getStringParam(params, "mirroringtarget", ""),
+			}
+
+			if us.MirroringTarget != "" && us.MirroringTarget == us.Label {
+				return nil, fmt.Errorf("detected self mirroring: %s", us.Label)
 			}
 
 			upstreams = append(upstreams, us)

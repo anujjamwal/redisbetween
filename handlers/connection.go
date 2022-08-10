@@ -132,12 +132,12 @@ func (c *connection) handleMessage() (*zap.Logger, error) {
 			return l, err
 		}
 	} else {
-		l = c.log.With(zap.String("upstream", c.listenerConfig.Target))
+		l = c.log.With(zap.String("upstream", c.listenerConfig.Target), zap.Uint64("connection_id", c.id))
 		ctx := context.WithValue(context.WithValue(context.Background(), utils.CtxLogKey, l), utils.CtxStatsdKey, c.statsd)
 		client, ok := c.upstreamLookup.LookupByName(ctx, c.listenerConfig.Target)
 
 		if !ok {
-			return l, errors.New(fmt.Sprintf("cannot find upstream: %s", c.listenerConfig.Target))
+			return l, fmt.Errorf("cannot find upstream: %s", c.listenerConfig.Target)
 		}
 
 		var res []*redis.Message
@@ -147,6 +147,20 @@ func (c *connection) handleMessage() (*zap.Logger, error) {
 		c.interceptor(incomingCmds, res)
 
 		err = c.messenger.Write(c.ctx, l, res, c.conn, c.address, c.id, 0, len(res) > 1, c.conn.Close)
+
+		if err == nil && c.listenerConfig.Mirroring.Target != "" {
+			client, ok := c.upstreamLookup.LookupByName(ctx, c.listenerConfig.Mirroring.Target)
+
+			if !ok {
+				l.Error("failed to mirror request", zap.Error(fmt.Errorf("cannot find upstream: %s", c.listenerConfig.Mirroring.Target)))
+				return l, nil
+			}
+
+			if _, err = client.Call(ctx, wm); err != nil {
+				l.Error("failed to mirror request", zap.Error(err))
+				return l, nil
+			}
+		}
 	}
 
 	return l, err

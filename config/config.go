@@ -13,6 +13,10 @@ type Config struct {
 	Upstreams []*Upstream
 }
 
+type Mirroring struct {
+	Target string
+}
+
 type Listener struct {
 	Name              string
 	Network           string
@@ -22,6 +26,7 @@ type Listener struct {
 	MaxSubscriptions  int
 	MaxBlockers       int
 	Unlink            bool
+	Mirroring         Mirroring
 }
 
 type Upstream struct {

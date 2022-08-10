@@ -27,6 +27,7 @@ func BuildFromOptions(_ context.Context, opts *Options) (Config, error) {
 			MaxSubscriptions:  u.MaxSubscriptions,
 			MaxBlockers:       u.MaxBlockers,
 			Unlink:            opts.Unlink,
+			Mirroring:         Mirroring{Target: u.MirroringTarget},
 		})
 	}
 

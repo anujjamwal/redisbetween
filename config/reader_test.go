@@ -16,7 +16,7 @@ func TestBuildFromOptionsShouldReturnStaticConfigFromOpts(t *testing.T) {
 		Pretty:            false,
 		Statsd:            uuid.New().String(),
 		Level:             0,
-		Upstreams: []upstream{upstream{
+		Upstreams: []upstream{{
 			UpstreamConfigHost: uuid.New().String(),
 			Label:              uuid.New().String(),
 			MaxPoolSize:        10,
@@ -27,6 +27,7 @@ func TestBuildFromOptionsShouldReturnStaticConfigFromOpts(t *testing.T) {
 			Readonly:           false,
 			MaxSubscriptions:   8,
 			MaxBlockers:        9,
+			MirroringTarget:    uuid.New().String(),
 		}},
 	}
 	config, err := BuildFromOptions(context.Background(), &opts)
@@ -51,4 +52,5 @@ func TestBuildFromOptionsShouldReturnStaticConfigFromOpts(t *testing.T) {
 	assert.Equal(t, opts.Upstreams[0].MaxBlockers, config.Listeners[0].MaxBlockers)
 	assert.Equal(t, opts.Unlink, config.Listeners[0].Unlink)
 	assert.Equal(t, opts.Network, config.Listeners[0].Network)
+	assert.Equal(t, opts.Upstreams[0].MirroringTarget, config.Listeners[0].Mirroring.Target)
 }
